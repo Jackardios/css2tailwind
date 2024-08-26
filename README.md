@@ -218,6 +218,12 @@ Console output
 | tailwindConfig               | `Config`           | {}      | Set your tailwind config here                                                            |
 | postCSSPlugins               | `AcceptedPlugin[]` | []      | Array of acceptable postcss plugins                                                      |
 
+### ConverterOptions(options?)
+
+| Option                    | Type      | Default | Description                                                          |
+| ------------------------- | --------- | ------- | -------------------------------------------------------------------- |
+| skipAddingTailwindClasses | `boolean` | `false` | Defines whether to skip adding tailwind classes to the converted CSS |
+
 [build-img]: https://github.com/jackardios/css-to-tailwindcss/actions/workflows/release.yml/badge.svg
 [build-url]: https://github.com/jackardios/css-to-tailwindcss/actions/workflows/release.yml
 [downloads-img]: https://img.shields.io/npm/dt/css-to-tailwindcss

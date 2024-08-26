@@ -46,6 +46,10 @@ export interface ResolvedTailwindConverterConfig
   mapping: ConverterMapping;
 }
 
+export interface ConverterOptions {
+  skipAddingTailwindClasses?: boolean;
+}
+
 export const DEFAULT_CONVERTER_CONFIG: Omit<
   TailwindConverterConfig,
   'tailwindConfig'
@@ -76,7 +80,7 @@ export class TailwindConverter {
     };
   }
 
-  async convertCSS(css: string) {
+  async convertCSS(css: string, options?: ConverterOptions) {
     const nodesManager = new TailwindNodesManager();
     const parsed = await postcss(this.config.postCSSPlugins).process(css, {
       parser: postcssSafeParser,
@@ -90,16 +94,19 @@ export class TailwindConverter {
     });
 
     const nodes = nodesManager.getNodes();
-    nodes.forEach(node => {
-      if (node.tailwindClasses.length) {
-        node.rule.prepend(
-          new AtRule({
-            name: 'apply',
-            params: node.tailwindClasses.join(' '),
-          })
-        );
-      }
-    });
+
+    if (!options?.skipAddingTailwindClasses) {
+      nodes.forEach(node => {
+        if (node.tailwindClasses.length) {
+          node.rule.prepend(
+            new AtRule({
+              name: 'apply',
+              params: node.tailwindClasses.join(' '),
+            })
+          );
+        }
+      });
+    }
 
     this.cleanRaws(parsed.root);
 
