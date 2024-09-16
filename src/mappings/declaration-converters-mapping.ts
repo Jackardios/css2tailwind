@@ -108,8 +108,40 @@ function convertBorderDeclarationValue(
   config: ResolvedTailwindConverterConfig,
   classPrefix: string
 ) {
-  const [width, style, ...colorArray] = value.split(/\s+/m);
-  const color = colorArray.join(' ');
+  const tokens = value.trim().split(/\s+/m);
+  let width = '';
+  let style = '';
+  let color = '';
+
+  const borderStyles = new Set([
+    'none',
+    'hidden',
+    'dotted',
+    'dashed',
+    'solid',
+    'double',
+    'groove',
+    'ridge',
+    'inset',
+    'outset',
+  ]);
+
+  function isLength(value: string): boolean {
+    return (
+      /^[-+]?\d*\.?\d+(px|em|rem|ch|vw|vh|%)?$/.test(value) ||
+      ['thin', 'medium', 'thick'].includes(value)
+    );
+  }
+
+  for (const token of tokens) {
+    if (borderStyles.has(token)) {
+      style = token;
+    } else if (isLength(token)) {
+      width = token;
+    } else {
+      color += (color ? ' ' : '') + token;
+    }
+  }
 
   let classes: string[] = [];
 
