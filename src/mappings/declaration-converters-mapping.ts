@@ -128,7 +128,7 @@ function convertBorderDeclarationValue(
 
   function isLength(value: string): boolean {
     return (
-      /^[-+]?\d*\.?\d+(px|em|rem|ch|vw|vh|%)?$/.test(value) ||
+      /^[-+]?\d*\.?\d*(px|em|rem|ch|vw|vh|%)?$|^0$/.test(value) ||
       ['thin', 'medium', 'thick'].includes(value)
     );
   }
