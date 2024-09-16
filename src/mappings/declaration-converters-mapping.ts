@@ -149,15 +149,26 @@ function convertBorderDeclarationValue(
     if (!config.tailwindConfig.corePlugins.borderWidth) {
       return [];
     }
+    const widthClasses = convertSizeDeclarationValue(
+      width,
+      config.mapping.borderWidth,
+      classPrefix,
+      config.remInPx,
+      false,
+      'length'
+    );
+
+    // Handle arbitrary values for border width
     classes = classes.concat(
-      convertSizeDeclarationValue(
-        width,
-        config.mapping.borderWidth,
-        classPrefix,
-        config.remInPx,
-        false,
-        'length'
-      )
+      widthClasses.map(cls => {
+        if (cls.includes('[') && cls.includes(']')) {
+          // Only add 'w-' for the general 'border' case
+          return classPrefix === 'border'
+            ? cls.replace(`${classPrefix}-[`, `${classPrefix}-w-[`)
+            : cls;
+        }
+        return cls;
+      })
     );
   }
 
@@ -174,12 +185,16 @@ function convertBorderDeclarationValue(
     if (!config.tailwindConfig.corePlugins.borderColor) {
       return [];
     }
+    const colorClasses = convertColorDeclarationValue(
+      color,
+      config.mapping.borderColor,
+      classPrefix,
+      'color'
+    );
+    // Remove extra hyphen for color classes
     classes = classes.concat(
-      convertColorDeclarationValue(
-        color,
-        config.mapping.borderColor,
-        classPrefix,
-        'color'
+      colorClasses.map(cls =>
+        cls.replace(`${classPrefix}--`, `${classPrefix}-`)
       )
     );
   }
@@ -242,6 +257,88 @@ type DeclarationConverter = (
 
 interface DeclarationConvertersMapping {
   [property: string]: DeclarationConverter;
+}
+
+function convertBorderWidthDeclaration(
+  value: string,
+  config: ResolvedTailwindConverterConfig
+) {
+  const values = value.trim().split(/\s+/);
+  const borderWidthMap = config.mapping.borderWidth;
+  const remInPx = config.remInPx;
+
+  let classes: string[] = [];
+
+  if (values.length === 1) {
+    // Applies to all sides
+    classes = classes.concat(
+      convertSizeDeclarationValue(values[0], borderWidthMap, 'border', remInPx)
+    );
+  } else if (values.length === 2) {
+    // [vertical, horizontal]
+    const [vertical, horizontal] = values;
+
+    classes = classes.concat(
+      convertSizeDeclarationValue(vertical, borderWidthMap, 'border-y', remInPx)
+    );
+    if (horizontal !== '0' && horizontal !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(
+          horizontal,
+          borderWidthMap,
+          'border-x',
+          remInPx
+        )
+      );
+    }
+  } else if (values.length === 3) {
+    // [top, horizontal, bottom]
+    const [top, horizontal, bottom] = values;
+
+    classes = classes.concat(
+      convertSizeDeclarationValue(top, borderWidthMap, 'border-t', remInPx),
+      convertSizeDeclarationValue(bottom, borderWidthMap, 'border-b', remInPx)
+    );
+    if (horizontal !== '0' && horizontal !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(
+          horizontal,
+          borderWidthMap,
+          'border-x',
+          remInPx
+        )
+      );
+    }
+  } else if (values.length === 4) {
+    // [top, right, bottom, left]
+    const [top, right, bottom, left] = values;
+
+    if (top !== '0' && top !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(top, borderWidthMap, 'border-t', remInPx)
+      );
+    }
+    if (right !== '0' && right !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(right, borderWidthMap, 'border-r', remInPx)
+      );
+    }
+    if (bottom !== '0' && bottom !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(bottom, borderWidthMap, 'border-b', remInPx)
+      );
+    }
+    if (left !== '0' && left !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(left, borderWidthMap, 'border-l', remInPx)
+      );
+    }
+  } else {
+    // Invalid number of values
+    return [];
+  }
+
+  return classes;
 }
 
 export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
@@ -662,14 +759,7 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
 
   'border-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
-      ? convertSizeDeclarationValue(
-          declaration.value,
-          config.mapping.borderWidth,
-          'border',
-          config.remInPx,
-          false,
-          'length'
-        )
+      ? convertBorderWidthDeclaration(declaration.value, config)
       : [],
 
   bottom: (declaration, config) =>
