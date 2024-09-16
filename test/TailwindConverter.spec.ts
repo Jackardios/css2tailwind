@@ -587,7 +587,12 @@ describe('TailwindConverter', () => {
       td {
         border: solid rgba(148, 163, 184, 0.1);
       }
-    `;
+      .a {
+        border: rgba(148, 163, 184, 0.1) 0 dotted;
+      }
+      .b {
+        border: rgba(148, 163, 184, 0.1);
+      }`;
     const converted = await converter.convertCSS(css);
 
     expect(converted.convertedRoot.toString()).toMatchSnapshot();
@@ -595,6 +600,18 @@ describe('TailwindConverter', () => {
       {
         rule: expect.objectContaining({ selector: 'td' }),
         tailwindClasses: ['border-solid', 'border-[rgba(148,163,184,0.1)]'],
+      },
+      {
+        rule: expect.objectContaining({ selector: '.a' }),
+        tailwindClasses: [
+          'border-0',
+          'border-dotted',
+          'border-[rgba(148,163,184,0.1)]',
+        ],
+      },
+      {
+        rule: expect.objectContaining({ selector: '.b' }),
+        tailwindClasses: ['border-[rgba(148,163,184,0.1)]'],
       },
     ]);
   });
