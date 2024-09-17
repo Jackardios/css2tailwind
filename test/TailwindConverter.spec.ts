@@ -644,6 +644,10 @@ describe('TailwindConverter', () => {
       }
       .g {
         border: 4.5em solid;
+      }
+      .h {
+        border-color: rgba(148, 163, 184, 0.1);
+        border-width: 1px 2px 1px 2px;
       }`;
     const converted = await converter.convertCSS(css);
 
@@ -698,6 +702,14 @@ describe('TailwindConverter', () => {
       {
         rule: expect.objectContaining({ selector: '.g' }),
         tailwindClasses: ['border-w-[4.5em]', 'border-solid'],
+      },
+      {
+        rule: expect.objectContaining({ selector: '.h' }),
+        tailwindClasses: [
+          'border-x-2',
+          'border-[rgba(148,163,184,0.1)]',
+          'border-y',
+        ],
       },
     ]);
   });
