@@ -55,7 +55,10 @@ export function convertDeclarationValue(
     ];
   }
 
-  return [`${fallbackClassPrefix}-[${arbitraryValue}]`];
+  // Determine if we need to add a hyphen
+  const separator = fallbackClassPrefix.endsWith('-') ? '' : '-';
+
+  return [`${fallbackClassPrefix}${separator}[${arbitraryValue}]`];
 }
 
 export function strictConvertDeclarationValue(
@@ -108,8 +111,40 @@ function convertBorderDeclarationValue(
   config: ResolvedTailwindConverterConfig,
   classPrefix: string
 ) {
-  const [width, style, ...colorArray] = value.split(/\s+/m);
-  const color = colorArray.join(' ');
+  const tokens = value.trim().split(/\s+/m);
+  let width = '';
+  let style = '';
+  let color = '';
+
+  const borderStyles = new Set([
+    'none',
+    'hidden',
+    'dotted',
+    'dashed',
+    'solid',
+    'double',
+    'groove',
+    'ridge',
+    'inset',
+    'outset',
+  ]);
+
+  function isLength(value: string): boolean {
+    return (
+      /^[-+]?\d*\.?\d*(px|em|rem|ch|vw|vh|%)?$|^0$/.test(value) ||
+      ['thin', 'medium', 'thick'].includes(value)
+    );
+  }
+
+  for (const token of tokens) {
+    if (borderStyles.has(token)) {
+      style = token;
+    } else if (isLength(token)) {
+      width = token;
+    } else {
+      color += (color ? ' ' : '') + token;
+    }
+  }
 
   let classes: string[] = [];
 
@@ -117,15 +152,26 @@ function convertBorderDeclarationValue(
     if (!config.tailwindConfig.corePlugins.borderWidth) {
       return [];
     }
+    const widthClasses = convertSizeDeclarationValue(
+      width,
+      config.mapping.borderWidth,
+      classPrefix,
+      config.remInPx,
+      false,
+      'length'
+    );
+
+    // Handle arbitrary values for border width
     classes = classes.concat(
-      convertSizeDeclarationValue(
-        width,
-        config.mapping.borderWidth,
-        classPrefix,
-        config.remInPx,
-        false,
-        'length'
-      )
+      widthClasses.map(cls => {
+        if (cls.includes('[') && cls.includes(']')) {
+          // Only add 'w-' for the general 'border' case
+          return classPrefix === 'border'
+            ? cls.replace(`${classPrefix}-[`, `${classPrefix}-w-[`)
+            : cls;
+        }
+        return cls;
+      })
     );
   }
 
@@ -142,14 +188,17 @@ function convertBorderDeclarationValue(
     if (!config.tailwindConfig.corePlugins.borderColor) {
       return [];
     }
-    classes = classes.concat(
-      convertColorDeclarationValue(
-        color,
-        config.mapping.borderColor,
-        classPrefix,
-        'color'
-      )
+    // Use classPrefix directly for color
+    const colorClassPrefix = classPrefix;
+
+    const colorClasses = convertColorDeclarationValue(
+      color,
+      config.mapping.borderColor,
+      colorClassPrefix,
+      'color'
     );
+
+    classes = classes.concat(colorClasses);
   }
 
   return classes;
@@ -210,6 +259,118 @@ type DeclarationConverter = (
 
 interface DeclarationConvertersMapping {
   [property: string]: DeclarationConverter;
+}
+
+function convertBorderWidthDeclaration(
+  value: string,
+  config: ResolvedTailwindConverterConfig
+) {
+  const values = value.trim().split(/\s+/);
+  const borderWidthMap = config.mapping.borderWidth;
+  const remInPx = config.remInPx;
+
+  let classes: string[] = [];
+
+  if (values.length === 1) {
+    // Applies to all sides
+    classes = classes.concat(
+      convertSizeDeclarationValue(values[0], borderWidthMap, 'border', remInPx)
+    );
+  } else if (values.length === 2) {
+    // [vertical, horizontal]
+    const [vertical, horizontal] = values;
+    classes = classes.concat(
+      convertSizeDeclarationValue(vertical, borderWidthMap, 'border-y', remInPx)
+    );
+    if (horizontal !== '0' && horizontal !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(
+          horizontal,
+          borderWidthMap,
+          'border-x',
+          remInPx
+        )
+      );
+    }
+  } else if (values.length === 3) {
+    // [top, horizontal, bottom]
+    const [top, horizontal, bottom] = values;
+    classes = classes.concat(
+      convertSizeDeclarationValue(top, borderWidthMap, 'border-t', remInPx),
+      convertSizeDeclarationValue(bottom, borderWidthMap, 'border-b', remInPx)
+    );
+    if (horizontal !== '0' && horizontal !== '0px') {
+      classes = classes.concat(
+        convertSizeDeclarationValue(
+          horizontal,
+          borderWidthMap,
+          'border-x',
+          remInPx
+        )
+      );
+    }
+  } else if (values.length === 4) {
+    // [top, right, bottom, left]
+    const [top, right, bottom, left] = values;
+
+    // Check if vertical sides are the same
+    if (top === bottom) {
+      classes = classes.concat(
+        convertSizeDeclarationValue(top, borderWidthMap, 'border-y', remInPx)
+      );
+    } else {
+      if (top !== '0' && top !== '0px') {
+        classes = classes.concat(
+          convertSizeDeclarationValue(top, borderWidthMap, 'border-t', remInPx)
+        );
+      }
+      if (bottom !== '0' && bottom !== '0px') {
+        classes = classes.concat(
+          convertSizeDeclarationValue(
+            bottom,
+            borderWidthMap,
+            'border-b',
+            remInPx
+          )
+        );
+      }
+    }
+
+    // Check if horizontal sides are the same
+    if (right === left) {
+      if (right !== '0' && right !== '0px') {
+        classes = classes.concat(
+          convertSizeDeclarationValue(
+            right,
+            borderWidthMap,
+            'border-x',
+            remInPx
+          )
+        );
+      }
+    } else {
+      if (right !== '0' && right !== '0px') {
+        classes = classes.concat(
+          convertSizeDeclarationValue(
+            right,
+            borderWidthMap,
+            'border-r',
+            remInPx
+          )
+        );
+      }
+      if (left !== '0' && left !== '0px') {
+        classes = classes.concat(
+          convertSizeDeclarationValue(left, borderWidthMap, 'border-l', remInPx)
+        );
+      }
+    }
+  } else {
+    // Invalid number of values
+    return [];
+  }
+
+  return classes;
 }
 
 export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
@@ -463,9 +624,6 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
         )
       : [],
 
-  // 'border-bottom-style': (declaration, config) =>
-  //   strictConvertDeclarationValue(declaration.value, UTILITIES_MAPPING['border-style']),
-
   'border-bottom-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
       ? convertSizeDeclarationValue(
@@ -509,9 +667,6 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
         )
       : [],
 
-  // 'border-left-style': (declaration, config) =>
-  //   strictConvertDeclarationValue(declaration.value, UTILITIES_MAPPING['border-style']),
-
   'border-left-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
       ? convertSizeDeclarationValue(
@@ -546,9 +701,6 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
           'color'
         )
       : [],
-
-  // 'border-right-style': (declaration, config) =>
-  //   strictConvertDeclarationValue(declaration.value, UTILITIES_MAPPING['border-style']),
 
   'border-right-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
@@ -613,9 +765,6 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
         )
       : [],
 
-  // 'border-top-style': (declaration, config) =>
-  //   strictConvertDeclarationValue(declaration.value, UTILITIES_MAPPING['border-style']),
-
   'border-top-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
       ? convertSizeDeclarationValue(
@@ -630,14 +779,7 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
 
   'border-width': (declaration, config) =>
     config.tailwindConfig.corePlugins.borderWidth
-      ? convertSizeDeclarationValue(
-          declaration.value,
-          config.mapping.borderWidth,
-          'border',
-          config.remInPx,
-          false,
-          'length'
-        )
+      ? convertBorderWidthDeclaration(declaration.value, config)
       : [],
 
   bottom: (declaration, config) =>
@@ -806,7 +948,6 @@ export const DECLARATION_CONVERTERS_MAPPING: DeclarationConvertersMapping = {
       saturate:
         config.tailwindConfig.corePlugins.saturate && config.mapping.saturate,
       sepia: config.tailwindConfig.corePlugins.sepia && config.mapping.sepia,
-      // 'drop-shadow': config.tailwindConfig.corePlugins.dropShadow && config.mapping.dropShadow,
     };
 
     parseCSSFunctions(declaration.value).every(({ name, value }) => {
